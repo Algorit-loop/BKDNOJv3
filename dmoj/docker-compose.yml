@@ -1,0 +1,140 @@
+version: '3.7'
+services:
+  db:
+    container_name: bkdnoj_mysql
+    image: mariadb
+    restart: unless-stopped
+    volumes:
+      - ./database/:/var/lib/mysql/
+    env_file: [environment/mysql.env, environment/mysql-admin.env]
+    networks: [db]
+    #ports:
+    #  - 3306:3306
+  redis:
+    container_name: bkdnoj_redis
+    image: redis:alpine
+    restart: unless-stopped
+    # # Limit Redis memory and use LRU eviction.
+    # # Without a limit, Redis uses 'noeviction' policy by default, meaning
+    # # write operations (e.g. session saves) will fail with OOM errors when
+    # # memory is full, crashing uWSGI workers and causing 502 errors.
+    # command: >
+    #   redis-server
+    #   --maxmemory 256mb
+    #   --maxmemory-policy allkeys-lru
+    #   --save ""
+    #   --appendonly no
+    networks: [site]
+    #ports:
+    #  - 6379:6379
+  base:
+    build:
+      context: .
+      dockerfile: ./base/Dockerfile
+    image: bkdnoj/bkdnoj-base
+    network_mode: none
+  site:
+    container_name: bkdnoj_site
+    build:
+      context: .
+      dockerfile: ./site/Dockerfile
+    image: bkdnoj/bkdnoj-site
+    init: true
+    restart: unless-stopped
+    volumes:
+      - assets:/assets/
+      - userdatacache:/userdatacache/
+      - contestdatacache:/contestdatacache/
+      - cache:/cache/
+      - ./media/:/media/
+      - ./problems/:/problems/
+      - ./generate_testcase/:/generate_testcase/
+      - ./repo/:/site/
+    working_dir: /site/
+    env_file: [environment/mysql.env, environment/site.env]
+    networks: [site, nginx, db]
+    depends_on: [base, db, redis]
+  celery:
+    container_name: bkdnoj_celery
+    build:
+      context: .
+      dockerfile: ./celery/Dockerfile
+    image: bkdnoj/bkdnoj-celery
+    init: true
+    restart: unless-stopped
+    volumes:
+      - userdatacache:/userdatacache/
+      - contestdatacache:/contestdatacache/
+      - ./repo/:/site/
+      - ./problems/:/problems/
+    working_dir: /site/
+    env_file: [environment/mysql.env, environment/site.env]
+    networks: [site, db]
+    depends_on: [base, db, redis]
+  bridged:
+    container_name: bkdnoj_bridged
+    build:
+      context: .
+      dockerfile: ./bridged/Dockerfile
+    image: bkdnoj/bkdnoj-bridged
+    init: true
+    restart: unless-stopped
+    volumes:
+      - ./problems/:/problems/
+      - ./generate_testcase/:/generate_testcase/
+      - ./repo/:/site/
+    working_dir: /site/
+    env_file: [environment/mysql.env, environment/site.env]
+    networks: [site, nginx, db]
+    depends_on: [base, db, redis]
+    ports:
+      - 9998:9998
+      - 9999:9999
+  wsevent:
+    container_name: bkdnoj_wsevent
+    build:
+      context: .
+      dockerfile: ./wsevent/Dockerfile
+    image: bkdnoj/bkdnoj-wsevent
+    init: true
+    restart: unless-stopped
+    volumes:
+      - ./repo/:/app/site/
+    working_dir: /app/site
+    env_file: [environment/mysql.env, environment/site.env]
+    networks: [site, nginx]
+    depends_on: [base]
+    #ports:
+    #  - 15100:15100
+    #  - 15101:15101
+    #  - 15102:15102
+  # redis-flush:
+  #   image: redis:alpine
+  #   restart: unless-stopped
+  #   networks: [site]
+  #   depends_on: [redis]
+  #   command: sh -c "while true; do redis-cli -h redis FLUSHDB && sleep 28800; done"
+  nginx:
+    container_name: bkdnoj_nginx
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - 80:80
+    volumes:
+      - assets:/assets/
+      - userdatacache:/userdatacache/
+      - contestdatacache:/contestdatacache/
+      - cache:/cache/
+      - ./media/:/media/
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+    networks: [nginx]
+    depends_on: [site, wsevent]
+networks:
+  site:
+  db:
+  nginx:
+volumes:
+  assets:
+  userdatacache:
+  contestdatacache:
+  cache:

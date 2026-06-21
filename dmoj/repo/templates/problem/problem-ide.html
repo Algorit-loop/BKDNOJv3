@@ -1,0 +1,1100 @@
+{% extends "base.html" %}
+
+{% block media %}
+    <style>
+        /* === Full-viewport IDE reset === */
+        html, body { overflow: hidden !important; height: 100% !important; margin: 0 !important; padding: 0 !important; }
+        footer, #announcement, #nav-shadow { display: none !important; }
+        #page-container {
+            max-width: none !important; border: none !important;
+            overflow: hidden !important; margin: 0 !important; padding: 0 !important;
+        }
+        #content {
+            margin: 0 !important; padding: 0 !important;
+            width: 100% !important; min-height: 0 !important;
+        }
+        #content-body { height: 100%; margin: 0; padding: 0 !important; }
+
+        /* === Variables === */
+        :root {
+            --bd: #e2e2e2; --bg: #fafafa; --bg2: #f5f5f5;
+            --text: #262626; --text2: #595959; --text3: #8c8c8c;
+            --accent: #2d8cf0; --green: #2cbb5d; --red: #ef4743;
+            --orange: #ffa116; --mono: 'Menlo','Consolas','Monaco','Courier New',monospace;
+        }
+
+        /* === IDE Layout === */
+        .ide {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; overflow: hidden; background: #eff1f5;
+            padding: 6px; gap: 0; z-index: 1;
+        }
+
+        /* Dividers */
+        .dv { flex-shrink: 0; background: transparent; position: relative; z-index: 2; }
+        .dv-v { width: 10px; cursor: col-resize; }
+        .dv-h { height: 10px; cursor: row-resize; }
+        .dv::after {
+            content: ''; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%); border-radius: 2px;
+            background: rgba(0,0,0,.15); transition: background .15s;
+        }
+        .dv-v::after { width: 3px; height: 32px; }
+        .dv-h::after { height: 3px; width: 32px; }
+        .dv:hover::after { background: var(--accent); }
+        body.dragging { user-select: none !important; }
+        .drag-overlay { position: fixed; inset: 0; z-index: 9999; }
+
+        /* Panel frame (shared) */
+        .panel-frame {
+            background: #fff; border-radius: 10px;
+            border: 1px solid var(--bd); overflow: hidden;
+        }
+
+        /* === Left Panel === */
+        .ide-L {
+            width: 45%; min-width: 280px; overflow-y: auto; overflow-x: hidden;
+        }
+        .ide-L-head {
+            padding: 12px 16px 10px; border-bottom: 1px solid var(--bd);
+        }
+        .ide-L-body {
+            padding: 16px 20px 24px;
+        }
+        /* Thin scrollbar */
+        .ide-L::-webkit-scrollbar, .bot-content::-webkit-scrollbar { width: 5px; }
+        .ide-L::-webkit-scrollbar-thumb, .bot-content::-webkit-scrollbar-thumb {
+            background: #ccc; border-radius: 3px;
+        }
+
+        /* Title row */
+        .ide-ttl { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .ide-ttl h3 { margin: 0; font-size: 1.5em; font-weight: 700; color: var(--text); }
+        .ide-ttl .fa { font-size: 1.1em; }
+        .ide-pts {
+            display: inline-block; padding: 1px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600; background: #f0f9ff;
+            color: var(--accent); border: 1px solid #cce5ff;
+        }
+
+        /* Info grid */
+        .ide-info { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.85em; color: var(--text2); }
+        .ide-info .ii { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .ide-info .ii i { color: #aaa; width: 14px; text-align: center; }
+        .ide-info .ii b { font-weight: 600; color: var(--text); }
+        .ide-ll { font-size: 11px; color: #aaa; padding-left: 2px; margin-top: 2px; }
+        .ide-ll span { margin-right: 8px; }
+        .ide-au { font-size: 0.85em; color: var(--text2); margin-top: 3px; }
+        .ide-au i { color: #bbb; margin-right: 2px; }
+
+        /* Toggles */
+        .ide-L-head .ide-toggle {
+            font-size: 12px; color: var(--text2); cursor: pointer;
+            padding: 2px 0; user-select: none;
+        }
+        .ide-L-head .ide-toggle:hover { color: var(--text); }
+        .ide-L-head .toggled { font-size: 11px; padding: 1px 0 1px 18px; color: #999; }
+
+        /* Action buttons */
+        .ide-admin-actions {
+            display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
+            padding-top: 6px; border-top: 1px solid #f0f0f0;
+        }
+        .ide-admin-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+            padding: 4px 10px; font-size: 12px; font-weight: 500;
+            background: #f0f5ff; color: #4a6fa5; border: 1px solid #d0dff0;
+            border-radius: 6px; text-decoration: none;
+            transition: all 0.15s ease; white-space: nowrap;
+        }
+        .ide-admin-btn:hover {
+            background: #dce8f8; border-color: #b0c8e8; color: #2d5a8e;
+            transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .ide-admin-btn i { font-size: 12px; }
+        .ide-admin-btn .badge {
+            background: #e74c3c; color: #fff; padding: 0 5px;
+            border-radius: 8px; font-size: 10px; margin-left: 2px;
+        }
+
+        /* === Right Panel === */
+        .ide-R {
+            flex: 1; min-width: 350px; display: flex; flex-direction: column;
+            overflow: hidden; gap: 6px;
+        }
+
+        /* Toolbar */
+        .ide-bar {
+            display: flex; align-items: center; padding: 6px 12px; gap: 8px;
+            background: var(--bg); border-bottom: 1px solid var(--bd); flex-shrink: 0;
+            border-radius: 10px 10px 0 0;
+        }
+        .ide-bar select {
+            padding: 5px 10px; border: 1px solid var(--bd); border-radius: 6px;
+            font-size: 13px; background: #fff; min-width: 130px; outline: none;
+        }
+        .ide-bar select:focus { border-color: var(--accent); }
+        .btn-run, .btn-sub {
+            border: none; padding: 6px 16px; border-radius: 6px;
+            font-size: 13px; font-weight: 600; cursor: pointer; color: #fff;
+            transition: filter .15s;
+        }
+        .btn-run { background: var(--green); }
+        .btn-sub { background: var(--accent); }
+        .btn-run:hover, .btn-sub:hover { filter: brightness(.92); }
+        .btn-run:disabled { opacity: .5; cursor: not-allowed; }
+        .bar-sp { flex: 1; }
+        .save-st { font-size: 11px; color: #bbb; display: flex; align-items: center; gap: 4px; }
+        .save-st .dot {
+            width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+        }
+        .dot.saved { background: var(--green); }
+        .dot.unsaved { background: var(--orange); }
+        .dot.saving { background: #17a2b8; }
+
+        /* Editor + Bottom wrapper */
+        .ide-R { gap: 0; }
+        .ide-top-frame {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden;
+            background: #fff; border-radius: 10px; border: 1px solid var(--bd);
+        }
+        .ide-editor { flex: 1; position: relative; min-height: 120px; overflow: hidden; }
+        #ace-ed { position: absolute; inset: 0; }
+        .ide-editor .cm-editor {
+            height: 100%; border-radius: 0 0 10px 10px;
+            font-size: 14px;
+        }
+        .ide-editor .cm-editor .cm-scroller { overflow: auto !important; }
+        .ide-editor .cm-editor .cm-content { font-family: var(--mono); }
+        .ide-editor .cm-editor .cm-gutters { font-family: var(--mono); border-right: 1px solid var(--bd); }
+        .ide-editor .cm-editor.cm-focused { outline: none; }
+
+        /* === Bottom Panel === */
+        .ide-bot {
+            height: 240px; min-height: 80px; display: flex; flex-direction: column;
+            overflow: hidden; background: #fff; border-radius: 10px;
+            border: 1px solid var(--bd);
+        }
+        .bot-tabs {
+            display: flex; background: var(--bg);
+            border-bottom: 1px solid var(--bd); flex-shrink: 0;
+            border-radius: 10px 10px 0 0;
+        }
+        .bot-tabs .bt {
+            padding: 7px 18px; cursor: pointer; font-size: 13px; font-weight: 500;
+            color: var(--text3); border-bottom: 2px solid transparent;
+            transition: color .12s, border-color .12s; user-select: none;
+        }
+        .bot-tabs .bt:hover { color: var(--text); }
+        .bot-tabs .bt.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+        .bot-content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+        .pnl { display: none; padding: 12px 14px; flex-direction: column; flex: 1; min-height: 0; }
+        .pnl.on { display: flex; }
+
+        /* === Testcase UI === */
+        .tc-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; flex-shrink: 0; }
+        .tc-t {
+            padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+            font-weight: 500; background: var(--bg2); border: 1px solid var(--bd);
+            user-select: none; transition: background .12s;
+        }
+        .tc-t:hover { background: #eaeaea; }
+        .tc-t.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .tc-x { margin-left: 5px; font-weight: 700; cursor: pointer; font-size: 13px; opacity: .7; }
+        .tc-x:hover { opacity: 1; }
+        .tc-add {
+            padding: 5px 12px; border: 1px dashed #bbb; border-radius: 6px;
+            cursor: pointer; font-size: 12px; background: transparent; color: #999;
+            user-select: none; transition: all .12s;
+        }
+        .tc-add:hover { background: var(--bg2); border-color: #999; color: #666; }
+        .tc-lbl { font-weight: 600; font-size: 12px; color: var(--text2); margin: 6px 0 2px; flex-shrink: 0; }
+        .tc-lbl:first-child { margin-top: 0; }
+        #tc-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 2px; }
+        .tc-ta {
+            width: 100%; min-height: 48px; flex: 1; font-family: var(--mono); font-size: 13px;
+            border: 1px solid var(--bd); border-radius: 6px; padding: 8px;
+            resize: none; box-sizing: border-box; background: var(--bg);
+            transition: border-color .12s, background .12s; overflow-y: auto;
+        }
+        .tc-ta:focus { border-color: var(--accent); background: #fff; outline: none; }
+        .tc-counter {
+            font-size: 11px; color: var(--text3); text-align: right;
+            padding: 2px 4px 0; flex-shrink: 0;
+        }
+        .tc-counter-warn { color: var(--orange); }
+        .tc-counter-err { color: var(--red); font-weight: 600; }
+        .tc-exp {
+            background: #f7f7f7; border: 1px solid #eaeaea; border-radius: 6px; padding: 8px;
+            font-family: var(--mono); font-size: 13px; flex: 1; min-height: 40px;
+            white-space: pre-wrap; word-wrap: break-word; overflow-y: auto;
+        }
+
+        /* === Result UI === */
+        .rs {
+            display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+            padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; flex-shrink: 0;
+        }
+        .rs-st { font-size: 15px; font-weight: 700; }
+        .rs-meta { font-size: 13px; color: var(--text2); display: flex; gap: 16px; flex-wrap: wrap; }
+
+        /* st-* removed: use case-* from submission.scss (loaded globally) */
+        /* bg-* groupings match case-* from submission.scss */
+        .bg-AC { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .bg-WA { background: #fef2f2; border: 1px solid #fecaca; }
+        .bg-TLE,.bg-SC { background: #f3f4f6; border: 1px solid #d1d5db; }
+        .bg-MLE,.bg-OLE,.bg-RTE,.bg-IR { background: #fffbeb; border: 1px solid #fde68a; }
+        .bg-CE,.bg-IE,.bg-AB { background: #f9fafb; border: 1px solid #e5e7eb; }
+
+        .rc-bar { display: flex; gap: 6px; margin: 10px 0; flex-wrap: wrap; }
+        .rc-t {
+            padding: 5px 14px; border: 1px solid var(--bd); border-radius: 6px;
+            cursor: pointer; font-size: 12px; font-weight: 600; user-select: none;
+            transition: all .12s;
+        }
+        .rc-t.on { border-width: 2px; }
+        /* rc-* tab colors match case-* from submission.scss */
+        .rc-t.rc-AC { color: green; border-color: green; }
+        .rc-t.rc-AC.on { background: #f0fdf4; }
+        .rc-t.rc-WA { color: #ef1b53; border-color: #ef1b53; }
+        .rc-t.rc-WA.on { background: #fef2f2; }
+        .rc-t.rc-TLE,.rc-t.rc-SC { color: gray; border-color: gray; }
+        .rc-t.rc-TLE.on,.rc-t.rc-SC.on { background: #f3f4f6; }
+        .rc-t.rc-MLE,.rc-t.rc-OLE,.rc-t.rc-RTE,.rc-t.rc-IR { color: orange; border-color: orange; }
+        .rc-t.rc-MLE.on,.rc-t.rc-OLE.on,.rc-t.rc-RTE.on,.rc-t.rc-IR.on { background: #fffbeb; }
+        .rc-t.rc-CE,.rc-t.rc-IE,.rc-t.rc-AB { color: #888; border-color: #aaa; }
+        .rc-t.rc-CE.on,.rc-t.rc-IE.on,.rc-t.rc-AB.on { background: #f9fafb; }
+
+        .rd-meta { font-size: 12px; color: #999; margin-bottom: 6px; display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+        /* #pnl-res is the single scroll container — identical role to .bot-content for Testcase */
+        #pnl-res { overflow-y: auto; }
+        #ide-res { display: flex; flex-direction: column; flex: none; }
+        #rc-det { display: flex; flex-direction: column; gap: 6px; }
+        .rd-row { display: flex; flex-direction: column; }
+        .rd-lbl { font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 3px; }
+        .rd-val {
+            background: #f7f7f7; border: 1px solid #eaeaea; border-radius: 6px; padding: 8px;
+            font-family: var(--mono); font-size: 13px; line-height: 1.5;
+            min-height: calc(3em + 16px); /* 2 text lines (2 × 1.5em) + top/bottom padding */
+            white-space: pre-wrap; word-wrap: break-word; overflow-y: auto;
+        }
+        .rs-err pre {
+            background: #fff5f5; border: 1px solid #fecaca; border-radius: 6px; padding: 10px;
+            color: var(--red); font-size: 13px; white-space: pre-wrap; max-height: 180px; overflow-y: auto;
+        }
+        .rs-ph { color: #bbb; font-size: 14px; padding: 30px 0; text-align: center; }
+
+        /* === Login overlay for guests === */
+        .ide-login-overlay {
+            position: absolute; inset: 0; z-index: 10;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: var(--bg); gap: 12px;
+        }
+        .ide-login-overlay i { font-size: 36px; color: #ccc; }
+        .ide-login-overlay p { font-size: 14px; color: var(--text2); margin: 0; text-align: center; }
+        .ide-login-overlay a {
+            display: inline-block; padding: 8px 24px; border-radius: 6px;
+            background: var(--accent); color: #fff; font-weight: 600; font-size: 13px;
+            text-decoration: none; transition: filter .15s;
+        }
+        .ide-login-overlay a:hover { filter: brightness(.9); }
+    </style>
+{% endblock %}
+
+{% block js_media %}
+    {% compress js %}
+        <script src="{{ static('libs/clipboard/clipboard.js') }}"></script>
+        <script src="{{ static('libs/clipboard/tooltip.js') }}"></script>
+        <script type="text/javascript">
+            $(function () {
+                window.add_code_copy_buttons = function ($c) {
+                    $c.find('pre code').each(function () {
+                        var cb;
+                        $(this).parent().before($('<div>', {'class': 'copy-clipboard'})
+                            .append(cb = $('<span>', {
+                                'class': 'btn-clipboard',
+                                'data-clipboard-text': $(this).text(),
+                                'title': {{ _('Click to copy')|htmltojs }}
+                            }).text({{ _('Copy')|htmltojs }})));
+                        $(cb.get(0)).mouseleave(function () {
+                            $(this).attr('class', 'btn-clipboard').removeAttr('aria-label');
+                        });
+                        var clip = new Clipboard(cb.get(0));
+                        clip.on('success', function (e) { e.clearSelection(); showTooltip(e.trigger, {{ _('Copied!')|htmltojs }}); });
+                        clip.on('error', function (e) { showTooltip(e.trigger, fallbackMessage(e.action)); });
+                    });
+                };
+                window.add_code_copy_buttons($(document));
+            });
+        </script>
+    {% endcompress %}
+    {% if request.user.is_authenticated %}
+    <script src="{{ CODEMIRROR6_URL }}/codemirror-ide.min.js" type="text/javascript"></script>
+    <script src="{{ CODEMIRROR6_URL }}/cm6-completions.js" type="text/javascript"></script>
+    {% endif %}
+    <script type="text/javascript">
+    $(function() {
+        var AUTHED = {{ 'true' if request.user.is_authenticated else 'false' }};
+        var LOGIN_URL = '{{ url("auth_login") }}?next={{ request.path|urlencode }}';
+        var SAMP = '{{ url("sample_testcases", problem.code) }}';
+
+        // IDE limits from settings
+        var MAX_CUSTOM_TC = {{ IDE_MAX_CUSTOM_TESTCASES }};
+        var MAX_INPUT_LEN = {{ IDE_MAX_CUSTOM_INPUT_LENGTH }};
+        var MAX_SOURCE_LEN = {{ IDE_MAX_SOURCE_LENGTH }};
+
+        // === Shared: Resize IDE to viewport ===
+        function fitIDE() {
+            var nh = ($('#navigation').outerHeight() || 0) +
+                     ($('#contest-info:visible').outerHeight() || 0);
+            $('.ide').css('top', nh + 'px');
+            if (window._ed) window._ed.resize();
+        }
+        $(window).on('resize', fitIDE);
+        fitIDE();
+
+        // === Shared: Resizable Panels ===
+        var dragT = null, $ov = null;
+        function startDrag(t, e) {
+            dragT = t; e.preventDefault();
+            $ov = $('<div class="drag-overlay">').css('cursor', t === 'v' ? 'col-resize' : 'row-resize').appendTo('body');
+            $('body').addClass('dragging').css('cursor', t === 'v' ? 'col-resize' : 'row-resize');
+        }
+        $('.dv-v').on('mousedown', function(e) { startDrag('v', e); });
+        $(document).on('mousedown', '.dv-h', function(e) { startDrag('h', e); });
+        $(document).on('mousemove', function(e) {
+            if (!dragT) return;
+            if (dragT === 'v') {
+                var r = document.querySelector('.ide').getBoundingClientRect();
+                var w = Math.max(250, Math.min(r.width - 400, e.clientX - r.left - 6));
+                document.querySelector('.ide-L').style.width = w + 'px';
+            } else {
+                var r = document.querySelector('.ide-R').getBoundingClientRect();
+                var h = Math.max(80, Math.min(r.height - 180, r.bottom - e.clientY));
+                document.querySelector('.ide-bot').style.height = h + 'px';
+            }
+            if (window._ed) window._ed.resize();
+        });
+        $(document).on('mouseup', function() {
+            if (!dragT) return;
+            dragT = null;
+            if ($ov) { $ov.remove(); $ov = null; }
+            $('body').removeClass('dragging').css('cursor', '');
+            if (window._ed) window._ed.resize();
+        });
+
+        // === Shared: Bottom Tabs ===
+        $('.bot-tabs .bt').click(function() {
+            var t = $(this).data('t');
+            $('.bot-tabs .bt').removeClass('on'); $(this).addClass('on');
+            $('.pnl').removeClass('on'); $('#' + t).addClass('on');
+        });
+
+        // === Shared: Toggles ===
+        $(document).on('click', '.ide-L-head .ide-toggle', function() {
+            $(this).toggleClass('open closed');
+            $(this).next('.toggled').slideToggle(150);
+        });
+
+        // === Shared: Testcases ===
+        var tcs = [], ai = 0;
+        function esc(s) { return $('<span>').text(s || '').html(); }
+        function addTC(inp, exp, sam) { tcs.push({i: inp||'', e: exp||'', s: !!sam}); rTabs(); swTC(tcs.length-1); }
+        function rmTC(x) { if (tcs.length<=1) return; tcs.splice(x,1); if (ai>=tcs.length) ai=tcs.length-1; rTabs(); rTC(); }
+        function swTC(x) { svTC(); ai = x; rTabs(); rTC(); }
+        function svTC() { var $v = $('#tc-in'); if ($v.length && ai < tcs.length) tcs[ai].i = $v.val(); }
+        function rTabs() {
+            var $b = $('#tc-bar').empty();
+            var ci = 0;
+            for (var j = 0; j < tcs.length; j++) {
+                var lbl;
+                if (tcs[j].s) { lbl = 'Sample ' + (j+1); }
+                else { ci++; lbl = 'Custom ' + ci; }
+                var $t = $('<span class="tc-t">').toggleClass('on', j===ai).data('x', j);
+                $t.append($('<span>').text(lbl));
+                if (!tcs[j].s && tcs.length > 1)
+                    $t.append($('<span class="tc-x">&times;</span>').data('x', j));
+                $b.append($t);
+            }
+            if (AUTHED) {
+                $b.append('<span class="tc-add">+ Add</span>');
+            }
+        }
+        function rTC() {
+            var tc = tcs[ai], h = '<div class="tc-lbl">Input</div>';
+            if (tc.s) {
+                // Sample: read-only display for both guests and authed
+                h += '<div class="tc-exp">' + esc(tc.i) + '</div>';
+            } else {
+                h += '<textarea id="tc-in" class="tc-ta" placeholder="Enter input..." maxlength="' + MAX_INPUT_LEN + '">' + esc(tc.i) + '</textarea>';
+                h += '<div id="tc-in-counter" class="tc-counter">' + (tc.i || '').length + ' / ' + MAX_INPUT_LEN + '</div>';
+            }
+            if (tc.s && tc.e) h += '<div class="tc-lbl">Expected Output</div><div class="tc-exp">' + esc(tc.e) + '</div>';
+            $('#tc-body').html(h);
+        }
+        $(document).on('input', '#tc-in', function() {
+            var len = $(this).val().length;
+            var $c = $('#tc-in-counter');
+            $c.text(len + ' / ' + MAX_INPUT_LEN);
+            $c.toggleClass('tc-counter-warn', len > MAX_INPUT_LEN * 0.9);
+            $c.toggleClass('tc-counter-err', len >= MAX_INPUT_LEN);
+        });
+        $(document).on('click', '#tc-bar .tc-t', function(e) { if (!$(e.target).hasClass('tc-x')) swTC($(this).data('x')); });
+        $(document).on('click', '#tc-bar .tc-x', function(e) { e.stopPropagation(); rmTC($(this).data('x')); });
+        $(document).on('click', '#tc-bar .tc-add', function() {
+            if (!AUTHED) { window.location.href = LOGIN_URL; return; }
+            var customCount = 0;
+            for (var k = 0; k < tcs.length; k++) { if (!tcs[k].s) customCount++; }
+            if (customCount >= MAX_CUSTOM_TC) { alert('Maximum ' + MAX_CUSTOM_TC + ' custom testcases'); return; }
+            svTC(); addTC('','',false);
+        });
+
+        $.getJSON(SAMP, function(d) {
+            var s = d.samples || [];
+            if (s.length) { tcs = []; for (var j = 0; j < s.length; j++) tcs.push({i: s[j].input||'', e: s[j].output||'', s: true}); ai = 0; rTabs(); rTC(); }
+        });
+        if (AUTHED) addTC('', '', false);
+        else if (!tcs.length) { tcs.push({i:'', e:'', s:true}); rTabs(); rTC(); }
+
+        {% if request.user.is_authenticated %}
+        // ============================================================
+        // === Authenticated user: full IDE functionality ===
+        // ============================================================
+        var P = {{ problem.code|htmltojs }}, UID = {{ request.user.id }},
+            TMPL = '{{ url("language_template_ajax") }}',
+            RURL = '{{ url("run_submit", problem.code) }}',
+            POLL = '{{ url("run_poll", 0) }}'.replace('/0', '/'),
+            SUBM = '{{ url("problem_submit", problem.code) }}',
+            TK = '{{ csrf_token }}';
+
+        // === CodeMirror 6 Editor ===
+        var CM = window.CM6;
+        var langCompartment = new CM.Compartment();
+        var themeCompartment = new CM.Compartment();
+
+        // Theme: classify ace_theme as light/dark
+        var ACE_THEME = '{{ request.profile.resolved_ace_theme }}';
+        var DARK_THEMES = [
+            'ambiance','chaos','clouds_midnight','cobalt','idle_fingers',
+            'kr_theme','merbivore','merbivore_soft','mono_industrial','monokai',
+            'pastel_on_dark','solarized_dark','terminal','tomorrow_night',
+            'tomorrow_night_blue','tomorrow_night_bright','tomorrow_night_eighties',
+            'twilight','vibrant_ink'
+        ];
+        var isDark = DARK_THEMES.indexOf(ACE_THEME) !== -1;
+        if (!ACE_THEME || ACE_THEME === 'None') {
+            isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+
+        // Mapping data-ace → CM6 language
+        var CM_LANGS = {
+            'c_cpp': function() { return CM.cpp(); },
+            'python': function() { return CM.python(); },
+            'java': function() { return CM.java(); },
+            'javascript': function() { return CM.javascript(); },
+            'rust': function() { return CM.rust(); },
+            'php': function() { return CM.php(); },
+            'text': function() { return []; },
+            'plain_text': function() { return []; },
+            'pascal': function() { return CM.StreamLanguage.define(CM.legacyModes.pascal); },
+            'ruby': function() { return CM.StreamLanguage.define(CM.legacyModes.ruby); },
+            'perl': function() { return CM.StreamLanguage.define(CM.legacyModes.perl); },
+            'csharp': function() { return CM.StreamLanguage.define(CM.legacyModes.csharp); },
+            'haskell': function() { return CM.StreamLanguage.define(CM.legacyModes.haskell); },
+            'golang': function() { return CM.StreamLanguage.define(CM.legacyModes.go); },
+            'kotlin': function() { return CM.StreamLanguage.define(CM.legacyModes.kotlin); },
+            'scala': function() { return CM.StreamLanguage.define(CM.legacyModes.scala); },
+            'swift': function() { return CM.StreamLanguage.define(CM.legacyModes.swift); },
+            'lua': function() { return CM.StreamLanguage.define(CM.legacyModes.lua); },
+            'd': function() { return CM.StreamLanguage.define(CM.legacyModes.d); },
+            'dart': function() { return CM.StreamLanguage.define(CM.legacyModes.dart); },
+            'coffee': function() { return CM.StreamLanguage.define(CM.legacyModes.coffeeScript); },
+            'fortran': function() { return CM.StreamLanguage.define(CM.legacyModes.fortran); },
+            'scheme': function() { return CM.StreamLanguage.define(CM.legacyModes.scheme); },
+            'groovy': function() { return CM.StreamLanguage.define(CM.legacyModes.groovy); },
+            'ocaml': function() { return CM.StreamLanguage.define(CM.legacyModes.oCaml); },
+            'fsharp': function() { return CM.StreamLanguage.define(CM.legacyModes.fSharp); },
+            'vbscript': function() { return CM.StreamLanguage.define(CM.legacyModes.vb); },
+            'assembly_x86': function() { return CM.StreamLanguage.define(CM.legacyModes.gas); },
+            'objectivec': function() { return CM.StreamLanguage.define(CM.legacyModes.objectiveC); },
+            'tcl': function() { return CM.StreamLanguage.define(CM.legacyModes.tcl); },
+            'cobol': function() { return CM.StreamLanguage.define(CM.legacyModes.cobol); },
+            'lisp': function() { return CM.StreamLanguage.define(CM.legacyModes.commonLisp); }
+        };
+
+        // Change listeners (adapter pattern)
+        var changeCallbacks = [];
+
+        // Build extensions
+        var extensions = [
+            CM.lineNumbers(),
+            CM.highlightActiveLineGutter(),
+            CM.highlightActiveLine(),
+            CM.drawSelection(),
+            CM.dropCursor(),
+            CM.indentOnInput(),
+            CM.bracketMatching(),
+            CM.closeBrackets(),
+            CM.foldGutter(),
+            CM.highlightSelectionMatches(),
+            CM.history(),
+            CM.syntaxHighlighting(CM.defaultHighlightStyle, {fallback: true}),
+            CM.EditorView.lineWrapping,
+            CM.keymap.of([
+                ...CM.closeBracketsKeymap,
+                ...CM.defaultKeymap,
+                ...CM.searchKeymap,
+                ...CM.historyKeymap,
+                ...CM.foldKeymap,
+                ...CM.completionKeymap,
+                CM.indentWithTab
+            ]),
+            CM.autocompletion({
+                override: [window.CM6_completionSource],
+                activateOnTyping: true
+            }),
+            themeCompartment.of(isDark ? CM.oneDark : []),
+            langCompartment.of([]),
+            CM.EditorView.updateListener.of(function(update) {
+                if (update.docChanged) {
+                    for (var i = 0; i < changeCallbacks.length; i++) changeCallbacks[i]();
+                }
+            })
+        ];
+
+        var editorView = new CM.EditorView({
+            state: CM.EditorState.create({ doc: '', extensions: extensions }),
+            parent: document.getElementById('ace-ed')
+        });
+
+        // Adapter: keeps ed.getValue/setValue/on interface for code below
+        var ed = {
+            getValue: function() { return editorView.state.doc.toString(); },
+            setValue: function(code, cursor) {
+                editorView.dispatch({
+                    changes: {from: 0, to: editorView.state.doc.length, insert: code || ''}
+                });
+                if (cursor === -1) {
+                    editorView.dispatch({selection: {anchor: 0}});
+                }
+            },
+            on: function(event, handler) {
+                if (event === 'change') changeCallbacks.push(handler);
+            }
+        };
+        window._ed = { resize: function() { editorView.requestMeasure(); } };
+
+        var $L = $('#ide-lang');
+        function lid() { return $L.val(); }
+        function setMode() {
+            var m = $L.find(':selected').data('ace');
+            var factory = CM_LANGS[m];
+            editorView.dispatch({
+                effects: langCompartment.reconfigure(factory ? factory() : [])
+            });
+            if (window.CM6_updateLang) window.CM6_updateLang(m);
+        }
+
+        // === localStorage Draft ===
+        function dk(l) { return 'ide:' + UID + ':' + P + ':' + l; }
+        function langKey() { return 'ide:' + UID + ':' + P + ':lang'; }
+        function save() { try { localStorage.setItem(dk(lid()), ed.getValue()); } catch(e) {} showS('saved'); }
+        function saveLang() { try { localStorage.setItem(langKey(), lid()); } catch(e) {} }
+        function load(l) { try { return localStorage.getItem(dk(l)); } catch(e) { return null; } }
+        function showS(s) {
+            $('#sv-dot').attr('class', 'dot ' + s);
+            $('#sv-txt').text(s === 'saved' ? 'Saved' : s === 'unsaved' ? 'Unsaved' : 'Saving...');
+        }
+        var _t = null;
+        ed.on('change', function() {
+            showS('unsaved');
+            if (_t) clearTimeout(_t);
+            _t = setTimeout(function() { showS('saving'); save(); }, 800);
+        });
+        function loadCode(l) {
+            var d = load(l);
+            if (d !== null) { ed.setValue(d, -1); showS('saved'); return; }
+            $.get(TMPL, {id: l}).done(function(t) {
+                ed.setValue(t || '', -1); showS('saved'); save();
+            }).fail(function() { ed.setValue('', -1); showS('saved'); });
+        }
+        // Restore saved language on page load
+        (function() {
+            try {
+                var sl = localStorage.getItem(langKey());
+                if (sl && $L.find('option[value="' + sl + '"]').length) {
+                    $L.val(sl);
+                }
+            } catch(e) {}
+        })();
+        $L.on('change', function() { save(); saveLang(); setMode(); loadCode(lid()); });
+        setMode(); loadCode(lid());
+        fitIDE();
+
+        // === Results ===
+        var LR = null, ari = 0;
+        var ST = {AC:'Accepted',SC:'Short Circuited',CE:'Compile Error',WA:'Wrong Answer',
+            RTE:'Runtime Error',TLE:'Time Limit Exceeded',MLE:'Memory Limit Exceeded',
+            OLE:'Output Limit Exceeded',IE:'Internal Error',AB:'Aborted',IR:'Invalid Return'};
+        function ft(t) { return t != null ? t.toFixed(3) + 's' : '—'; }
+        function fm(m) { return m != null ? (m/1024).toFixed(2) + ' MB' : '—'; }
+
+        function showRes(d) {
+            LR = d; ari = 0; var $p = $('#ide-res');
+            if (d.status !== 'done') {
+                var r = d.status;
+                var h = '<div class="rs bg-' + r + '"><span class="rs-st case-' + r + '">' + (ST[r]||r) + '</span></div>';
+                if (d.error) h += '<div class="rs-err"><pre>' + esc(stripAnsi(d.error)) + '</pre></div>';
+                $p.html(h); return;
+            }
+            var r = d.result;
+            var passed = d.passed;
+            var total = d.total_cases;
+            var h = '<div class="rs bg-' + r + '">';
+            h += '<span class="rs-st case-' + r + '">' + (ST[r]||r) + '</span>';
+            h += '<span class="rs-meta">';
+            if (total > 0) h += '<span>' + passed + '/' + total + ' samples passed</span>';
+            if (d.time != null) h += '<span>' + ft(d.time) + '</span>';
+            if (d.memory != null) h += '<span>' + fm(d.memory) + '</span>';
+            h += '</span></div>';
+            if (d.testcases && d.testcases.length) {
+                h += '<div id="rc-bar" class="rc-bar">';
+                for (var j = 0; j < d.testcases.length; j++) {
+                    var isSam = j < total;
+                    var s = d.testcases[j].status || 'IE';
+                    var isRuntimeErr = !isSam && s !== 'AC' && s !== 'WA' && s !== 'SC';
+                    var lbl = isSam ? 'Sample ' + (j+1) : 'Custom ' + (j-total+1);
+                    h += '<span class="rc-t' + ((isSam || isRuntimeErr) ? ' rc-' + s : '') + (j===0?' on':'') + '" data-x="' + j + '">' + lbl + '</span>';
+                }
+                h += '</div><div id="rc-det"></div>';
+            }
+            if (d.error) h += '<div class="rs-err"><pre>' + esc(stripAnsi(d.error)) + '</pre></div>';
+            $p.html(h);
+            if (d.testcases && d.testcases.length) showCase(0);
+        }
+        function stripAnsi(s) {
+            return (s || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/\x1b[()][A-Za-z0-9]/g, '').replace(/\x1b./g, '');
+        }
+        function truncOut(tc) { return tc.output || ''; }
+        function showCase(x) {
+            if (!LR || !LR.testcases) return;
+            ari = x;
+            $('#rc-bar .rc-t').removeClass('on');
+            $('#rc-bar .rc-t[data-x="'+x+'"]').addClass('on');
+            var tc = LR.testcases[x], s = tc.status || 'IE';
+            var isSam = x < LR.total_cases;
+            var h = '';
+            if (isSam) {
+                h += '<div class="rd-meta">';
+                h += '<span class="rs-st case-' + s + '" style="font-size:13px">' + (ST[s]||s) + '</span>';
+                h += '<span>' + ft(tc.time) + '</span><span>' + fm(tc.memory) + '</span></div>';
+                if (x < tcs.length && tcs[x])
+                    h += '<div class="rd-row"><div class="rd-lbl">Input</div><div class="rd-val">' + esc(tcs[x].i) + '</div></div>';
+                h += '<div class="rd-row"><div class="rd-lbl">Output</div><div class="rd-val">' + esc(truncOut(tc)) + '</div></div>';
+                if (tcs[x] && tcs[x].e)
+                    h += '<div class="rd-row"><div class="rd-lbl">Expected</div><div class="rd-val">' + esc(tcs[x].e) + '</div></div>';
+                if (tc.feedback)
+                    h += '<div class="rd-row"><div class="rd-lbl">Feedback</div><div class="rd-val">' + esc(tc.feedback) + '</div></div>';
+            } else {
+                var isNormal = s === 'AC' || s === 'WA' || s === 'SC';
+                h += '<div class="rd-meta">';
+                if (!isNormal) h += '<span class="rs-st case-' + s + '" style="font-size:13px">' + (ST[s]||s) + '</span>';
+                h += '<span>' + ft(tc.time) + '</span><span>' + fm(tc.memory) + '</span></div>';
+                if (x < tcs.length && tcs[x])
+                    h += '<div class="rd-row"><div class="rd-lbl">Input</div><div class="rd-val">' + esc(tcs[x].i) + '</div></div>';
+                h += '<div class="rd-row"><div class="rd-lbl">Output</div><div class="rd-val">' + esc(truncOut(tc)) + '</div></div>';
+            }
+            $('#rc-det').html(h);
+        }
+        $(document).on('click', '#rc-bar .rc-t', function() { showCase(+$(this).data('x')); });
+
+        // === Run ===
+        var rid = null, runSecret = null;
+
+        function fetchResult() {
+            if (!rid) return;
+            $.getJSON(POLL + rid, function(d) {
+                if (d.status === 'PENDING') return; // still pending, wait for next event
+                showRes(d);
+                runDone();
+            }).fail(function() {
+                $('#ide-res').html('<div class="rs bg-IE"><span class="rs-st case-IE">Poll failed</span></div>');
+                runDone();
+            });
+        }
+
+        function runDone() {
+            $('#btn-run').prop('disabled', false).text('▶ Run');
+            if (runSecret && typeof event_dispatcher.off === 'function') {
+                event_dispatcher.off('run_' + runSecret);
+            }
+            rid = null; runSecret = null;
+        }
+
+        function onRunEvent(message) {
+            switch (message.type) {
+                case 'processing':
+                    $('#ide-res').html('<div class="rs-ph">Processing...</div>');
+                    break;
+                case 'grading-begin':
+                    $('#ide-res').html('<div class="rs-ph">Grading...</div>');
+                    break;
+                case 'test-case':
+                    // Progress — keep showing "Grading..."
+                    break;
+                case 'compile-message':
+                    break;
+                case 'grading-end':
+                case 'compile-error':
+                case 'internal-error':
+                case 'aborted':
+                    fetchResult();
+                    break;
+            }
+        }
+
+        $('#btn-run').click(function() {
+            var src = ed.getValue(), l = lid();
+            if (!src.trim()) return;
+            if (src.length > MAX_SOURCE_LEN) {
+                alert('Source code too long (max ' + MAX_SOURCE_LEN + ' characters, current: ' + src.length + ')');
+                return;
+            }
+            if (_t) { clearTimeout(_t); _t = null; } save();
+            svTC();
+            var ci = [];
+            for (var k = 0; k < tcs.length; k++) {
+                if (!tcs[k].s) {
+                    var inp = tcs[k].i || '';
+                    if (inp.length > MAX_INPUT_LEN) {
+                        alert('Custom input ' + (ci.length + 1) + ' too long (max ' + MAX_INPUT_LEN + ' characters, current: ' + inp.length + ')');
+                        return;
+                    }
+                    ci.push(inp);
+                }
+            }
+            // Cancel previous run wsevent
+            if (runSecret) { event_dispatcher.off('run_' + runSecret); }
+            $(this).prop('disabled', true).text('Running...');
+            $('.bot-tabs .bt[data-t="pnl-res"]').click();
+            $('#ide-res').html('<div class="rs-ph">Running...</div>');
+            $.ajax({
+                url: RURL, method: 'POST', contentType: 'application/json',
+                headers: {'X-CSRFToken': TK},
+                data: JSON.stringify({source: src, language: parseInt(l), custom_inputs: ci}),
+                success: function(r) {
+                    rid = r.run_id;
+                    runSecret = r.id_secret;
+                    event_dispatcher.on('run_' + runSecret, onRunEvent);
+                },
+                error: function(x) {
+                    var e = 'Error'; try { e = JSON.parse(x.responseText).error || e; } catch(ex) {}
+                    $('#ide-res').html('<div class="rs bg-IE"><span class="rs-st case-IE">' + esc(e) + '</span></div>');
+                    $('#btn-run').prop('disabled', false).text('▶ Run');
+                }
+            });
+        });
+
+        // === Submit ===
+        $('#btn-sub').click(function() {
+            var src = ed.getValue();
+            if (!src.trim()) return;
+            if (src.length > MAX_SOURCE_LEN) {
+                alert('Source code too long (max ' + MAX_SOURCE_LEN + ' characters, current: ' + src.length + ')');
+                return;
+            }
+            if (_t) { clearTimeout(_t); _t = null; } save();
+            var $f = $('<form method="POST" action="' + SUBM + '">');
+            $f.append($('<input type="hidden" name="csrfmiddlewaretoken">').val(TK));
+            $f.append($('<input type="hidden" name="source">').val(src));
+            $f.append($('<input type="hidden" name="language">').val(lid()));
+            $f.append($('<input type="hidden" name="judge">').val(''));
+            $f.appendTo('body').submit();
+        });
+
+        {% else %}
+        // === Guest: redirect Run/Submit to login ===
+        $('#btn-run, #btn-sub').click(function(e) {
+            e.preventDefault();
+            window.location.href = LOGIN_URL;
+        });
+
+        {% endif %}
+
+        if (window.add_code_copy_buttons) window.add_code_copy_buttons($('#problem-content'));
+    });
+    </script>
+{% endblock %}
+
+{% block title_row %}{% endblock %}
+{% block title_ruler %}{% endblock %}
+{% block header %}{% endblock %}
+
+{% block body %}
+<div class="ide">
+    {# ===== LEFT ===== #}
+    <div class="ide-L panel-frame">
+        <div class="ide-L-head">
+            {# Title #}
+            <div class="ide-ttl">
+                {% if request.user.is_authenticated %}
+                    {% if problem.id in completed_problem_ids %}
+                        <a href="{{ url('user_submissions', problem.code, request.user.username) }}"><i class="solved-problem-color fa fa-check-circle"></i></a>
+                    {% elif problem.id in attempted_problems %}
+                        <a href="{{ url('user_submissions', problem.code, request.user.username) }}"><i class="attempted-problem-color fa fa-frown-o"></i></a>
+                    {% endif %}
+                {% endif %}
+                <h3>{{ title }}</h3>
+                <span class="ide-pts">
+                    {% if contest_problem %}
+                        {{ contest_problem.points }}{% if contest_problem.partial %} (partial){% endif %}
+                    {% else %}
+                        {{ problem.points|floatformat(2) }} pts
+                    {% endif %}
+                </span>
+                {% if has_pdf_render %}
+                    <a href="{{ url('problem_pdf', problem.code) }}" style="margin-left:auto;font-size:12px;color:var(--accent)"><i class="fa fa-file-pdf-o"></i> PDF</a>
+                {% endif %}
+            </div>
+
+            {# Info grid #}
+            <div class="ide-info">
+                <span class="ii"><i class="fa fa-clock-o"></i> <b>{{ problem.time_limit }}s</b></span>
+                <span class="ii"><i class="fa fa-server"></i> <b>{{ problem.memory_limit|kbsimpleformat }}</b></span>
+                {% if problem.io_method.method == 'standard' %}
+                    <span class="ii"><i class="fa fa-keyboard-o"></i> stdin / stdout</span>
+                {% elif problem.io_method.method == 'file' %}
+                    <span class="ii"><i class="fa fa-file-o"></i> {{ problem.io_method.input }} / {{ problem.io_method.output }}</span>
+                {% endif %}
+            </div>
+            {% if problem.language_time_limit %}
+                <div class="ide-ll">{% for n, l in problem.language_time_limit %}<span>{{ n }}: {{ l }}s</span>{% endfor %}</div>
+            {% endif %}
+            {% if problem.language_memory_limit %}
+                <div class="ide-ll">{% for n, l in problem.language_memory_limit %}<span>{{ n }}: {{ l|kbsimpleformat }}</span>{% endfor %}</div>
+            {% endif %}
+
+            {# Authors / Source #}
+            {% if not contest_problem or not contest_problem.contest.hide_problem_authors %}
+                {% cache 86400 'problem_authors' problem.id LANGUAGE_CODE %}
+                {% with authors=problem.authors.all() %}
+                    {% if authors %}
+                        <div class="ide-au"><i class="fa fa-pencil-square-o"></i>
+                            {% trans trimmed count=authors|length %}Author:{% pluralize count %}Authors:{% endtrans %}
+                            {{ link_users(authors) }}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                {% if problem.suggester %}
+                    <div class="ide-au"><i class="fa fa-pencil-square-o"></i> {{ _("Suggester:") }} {{ link_user(problem.suggester) }}</div>
+                {% endif %}
+                {% endcache %}
+            {% endif %}
+            {% if problem.source %}
+                <div class="ide-au"><i class="fa fa-book"></i> {{ _('Source:') }} {{ problem.source }}</div>
+            {% endif %}
+
+            {# Toggles #}
+            {% if not contest_problem or not contest_problem.contest.hide_problem_tags %}
+                <div class="ide-toggle closed unselectable" style="margin-top:4px">
+                    <i class="fa fa-chevron-right fa-fw"></i>
+                    {% trans trimmed count=problem.types_list|length %}Problem type{% pluralize count %}Problem types{% endtrans %}
+                </div>
+                <div style="display:none" class="toggled">{{ problem.types_list|join(", ") }}</div>
+            {% endif %}
+            {% if show_languages %}
+                <div class="ide-toggle closed unselectable">
+                    <i class="fa fa-chevron-right fa-fw"></i>{{ _('Allowed languages') }}
+                </div>
+                <div style="display:none" class="toggled">
+                    {% with usable=problem.usable_common_names, langs=problem.languages_list() %}
+                        {% for lang in langs %}
+                            {%- if lang in usable %}{{ lang }}{% else %}<s title="{{ _('No %(lang)s judge online', lang=lang) }}">{{ lang }}</s>{% endif -%}
+                            {% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% endwith %}
+                </div>
+            {% endif %}
+            {% if problem.is_editable_by(request.user) and available_judges %}
+                <div class="ide-au" style="margin-top:3px"><i class="fa fa-database"></i>
+                    {% trans trimmed count=available_judges|length %}Judge:{% pluralize count %}Judges:{% endtrans %}
+                    {% for j in available_judges %}{{ j.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+                </div>
+            {% endif %}
+
+            {# Submission limit (contest) #}
+            {% if request.user.is_authenticated and request.in_contest and submission_limit %}
+                <div class="ide-au" style="margin-top:3px;color:var(--orange)">
+                    <i class="fa fa-exclamation-triangle"></i>
+                    {% if submissions_left is defined and submissions_left > 0 %}
+                        {{ submissions_left }} {{ _('submissions left') }}
+                    {% elif submissions_left is defined %}
+                        {{ _('0 submissions left') }}
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            {# Links #}
+            <div class="ide-admin-actions">
+                {% if request.in_contest and contest_problem %}
+                    {% set contest = contest_problem.contest %}
+                    <a href="{{ url('contest_user_submissions', contest.key, request.user.username, problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-user"></i> {{ _('My submissions') }}
+                    </a>
+                    {% if contest.can_see_full_submission_list(request.user) %}
+                        <a href="{{ url('chronological_submissions', problem.code) }}" class="ide-admin-btn">
+                            <i class="fa fa-list"></i> {{ _('All submissions') }}
+                        </a>
+                        <a href="{{ url('contest_ranked_submissions', contest.key, problem.code) }}" class="ide-admin-btn">
+                            <i class="fa fa-trophy"></i> {{ _('Best submissions') }}
+                        </a>
+                    {% endif %}
+                {% else %}
+                    {% if request.user.is_authenticated and has_submissions %}
+                        <a href="{{ url('user_submissions', problem.code, request.user.username) }}" class="ide-admin-btn">
+                            <i class="fa fa-user"></i> {{ _('My submissions') }}
+                        </a>
+                    {% endif %}
+                    <a href="{{ url('chronological_submissions', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-list"></i> {{ _('All submissions') }}
+                    </a>
+                    <a href="{{ url('ranked_submissions', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-trophy"></i> {{ _('Best submissions') }}
+                    </a>
+                {% endif %}
+                {% if (editorial and editorial.is_accessible_by(request.user)) and not request.in_contest %}
+                    <a href="{{ url('problem_editorial', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-book"></i> {{ _('Read editorial') }}
+                    </a>
+                {% endif %}
+            </div>
+            {# Admin action buttons #}
+            {% if can_edit_problem or (request.user.is_authenticated and has_tickets) or perms.judge.edit_type_group_all_problem or problem.is_subs_manageable_by(request.user) or (perms.judge.clone_problem and can_edit_problem) %}
+            <div class="ide-admin-actions">
+                {% if can_edit_problem %}
+                    <a href="{{ url('problem_ticket_list', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-flag"></i> {{ _('Manage tickets') }}{% if num_open_tickets %} <span class="badge">{{ num_open_tickets }}</span>{% endif %}
+                    </a>
+                    <a href="{{ url('problem_edit', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-pencil-square-o"></i> {{ _('Edit problem') }}
+                    </a>
+                    {% if not problem.is_manually_managed %}
+                        <a href="{{ url('problem_data', problem.code) }}" class="ide-admin-btn">
+                            <i class="fa fa-database"></i> {{ _('Edit test data') }}
+                        </a>
+                    {% endif %}
+                {% elif request.user.is_authenticated and has_tickets %}
+                    <a href="{{ url('problem_ticket_list', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-flag"></i> {{ _('My tickets') }}{% if num_open_tickets %} <span class="badge">{{ num_open_tickets }}</span>{% endif %}
+                    </a>
+                {% endif %}
+                {% if perms.judge.edit_type_group_all_problem %}
+                    <a href="{{ url('problem_edit_type_group', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-object-group"></i> {{ _('Edit type group') }}
+                    </a>
+                {% endif %}
+                {% if problem.is_subs_manageable_by(request.user) %}
+                    <a href="{{ url('problem_manage_submissions', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-cogs"></i> {{ _('Manage submissions') }}
+                    </a>
+                {% endif %}
+                {% if perms.judge.clone_problem and can_edit_problem %}
+                    <a href="{{ url('problem_clone', problem.code) }}" class="ide-admin-btn">
+                        <i class="fa fa-clone"></i> {{ _('Clone problem') }}
+                    </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="ide-L-body">
+            {% if problem.is_suggesting %}
+                <div class="alert alert-warning alert-dismissable">
+                    <a class="close">x</a>
+                    <b>{{ _('This problem is only a suggestion!') }}</b><br>
+                    {{ _('This problem cannot be accessed by normal users until it is approved by an admin or staff.') }}
+                </div>
+            {% endif %}
+            <div id="problem-content" class="content-description">
+                {% include "problem/problem-detail.html" %}
+            </div>
+            {% if request.user.is_authenticated and not request.profile.mute %}
+                <hr>
+                <a href="{{ url('new_problem_ticket', problem.code) }}" class="button clarify">
+                    {%- if comment_lock and request.profile.current_contest.live -%}
+                        {{ _('Request clarification') }}
+                    {%- else -%}
+                        {{ _('Report an issue') }}
+                    {%- endif -%}
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Vertical divider #}
+    <div class="dv dv-v"></div>
+
+    {# ===== RIGHT ===== #}
+    <div class="ide-R">
+        <div class="ide-top-frame">
+            <div class="ide-bar">
+                {% if not no_judges %}
+                    {% if request.user.is_authenticated %}
+                    <select id="ide-lang">
+                        {% if form %}
+                            {% for lang in form.fields.language.queryset %}
+                                <option value="{{ lang.id }}" data-ace="{{ lang.ace }}"
+                                        {% if default_lang and lang.id == default_lang.id %}selected{% endif %}>
+                                    {{ lang.name }}
+                                </option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    {% endif %}
+                    <button id="btn-run" class="btn-run" type="button">▶ Run</button>
+                    <button id="btn-sub" class="btn-sub" type="button">Submit</button>
+                    <span class="bar-sp"></span>
+                    {% if request.user.is_authenticated %}
+                    <span class="save-st"><span id="sv-dot" class="dot saved"></span><span id="sv-txt">Saved</span></span>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div class="ide-editor">
+                {% if no_judges %}
+                <div class="ide-login-overlay">
+                    <i class="fa fa-exclamation-triangle"></i>
+                    <p>{{ _('This problem currently has no test cases or is not being graded.') }}</p>
+                </div>
+                {% elif request.user.is_authenticated %}
+                <div id="ace-ed"></div>
+                {% else %}
+                <div class="ide-login-overlay">
+                    <i class="fa fa-lock"></i>
+                    <p>{{ _('Please log in or sign up to use the code editor') }}</p>
+                    <a href="{{ url('auth_login') }}?next={{ request.path|urlencode }}">{{ _('Log in') }}</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="dv dv-h"></div>
+        <div class="ide-bot">
+            <div class="bot-tabs">
+                <div class="bt on" data-t="pnl-tc">Testcase</div>
+                <div class="bt" data-t="pnl-res">Result</div>
+            </div>
+            <div class="bot-content">
+                <div id="pnl-tc" class="pnl on">
+                    <div id="tc-bar" class="tc-bar"></div>
+                    <div id="tc-body"></div>
+                </div>
+                <div id="pnl-res" class="pnl">
+                    <div id="ide-res"><div class="rs-ph">Run your code to see results here.</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block bodyend %}
+    {% if REQUIRE_JAX %}{% include "mathjax-load.html" %}{% endif %}
+{% endblock %}
